@@ -1,0 +1,30 @@
+name: Jira Worklog Tracker
+
+on:
+  schedule:
+    # Weekdays at 16:00 UTC = 17:00 CET / 18:00 CEST
+    - cron: '0 16 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  check-worklogs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run worklog tracker
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          USER_MAPPING: ${{ secrets.USER_MAPPING }}
+        run: python worklog_tracker.py
