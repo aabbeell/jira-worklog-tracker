@@ -7,9 +7,11 @@ Checks daily logged hours per person and sends Slack DM if < 8 hours.
 import argparse
 import json
 import os
+import ssl
 import sys
 from datetime import date, datetime, timezone
 
+import certifi
 import requests
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -286,7 +288,8 @@ def main():
         print(f"  {data['name']}: {format_hours(data['total_seconds'])}")
 
     # Initialize Slack client
-    slack_client = WebClient(token=slack_bot_token)
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    slack_client = WebClient(token=slack_bot_token, ssl=ssl_context)
 
     # Check each mapped user
     notified = 0
