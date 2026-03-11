@@ -163,13 +163,20 @@ def format_hours(seconds):
 
 
 def build_slack_message(person_data, date_str, active_issues=None):
-    """Build a Slack message for someone with < 8 hours."""
-    missing_seconds = (8 * 3600) - person_data["total_seconds"]
+    """Build a Slack message with worklog summary."""
+    total = person_data["total_seconds"]
+    is_ok = total >= 8 * 3600
 
-    lines = [
-        f":wave: Szia! Tegnapi napra (*{date_str}*) összesen *{format_hours(person_data['total_seconds'])}* van logolva a Jirában.",
-        f"*{format_hours(missing_seconds)}* hiányzik a 8 órából.",
-    ]
+    if is_ok:
+        lines = [
+            f":white_check_mark: Szia! Tegnapi napra (*{date_str}*) összesen *{format_hours(total)}* van logolva a Jirában. Szép munka!",
+        ]
+    else:
+        missing_seconds = (8 * 3600) - total
+        lines = [
+            f":exclamation: Szia! Tegnapi napra (*{date_str}*) összesen *{format_hours(total)}* van logolva a Jirában.",
+            f"*{format_hours(missing_seconds)}* hiányzik a 8 órából.",
+        ]
 
     if person_data["tickets"]:
         lines.append("")
@@ -213,8 +220,9 @@ def build_slack_message(person_data, date_str, active_issues=None):
             lines.append("*Határidős feladatok:*")
             lines.extend(with_deadline)
 
-    lines.append("")
-    lines.append("Kérlek pótold a hiányzó órákat! :pray:")
+    if not is_ok:
+        lines.append("")
+        lines.append("Kérlek pótold a hiányzó órákat! :pray:")
 
     return "\n".join(lines)
 
@@ -306,14 +314,8 @@ def main():
     for jira_id, slack_id in user_mapping.items():
         person = people.get(jira_id)
         total_seconds = person["total_seconds"] if person else 0
+        is_ok = total_seconds >= 8 * 3600
 
-        if total_seconds >= 8 * 3600:
-            name = person["name"] if person else jira_id
-            print(f"\n{name}: {format_hours(total_seconds)} - OK")
-            skipped += 1
-            continue
-
-        # Less than 8 hours - send notification
         active_issues = get_active_issues(jira_base_url, jira_email, jira_api_token, jira_id, blacklisted_projects)
         if person:
             name = person["name"]
@@ -323,11 +325,16 @@ def main():
             person_data = {"total_seconds": 0, "tickets": {}}
             message = build_slack_message(person_data, date_str, active_issues)
 
-        print(f"\n{name}: {format_hours(total_seconds)} - UNDER 8h")
+        status = "OK" if is_ok else "UNDER 8h"
+        print(f"\n{name}: {format_hours(total_seconds)} - {status}")
         send_slack_dm(slack_client, slack_id, message, dry_run=args.dry_run)
-        notified += 1
 
-    print(f"\nDone! Notified: {notified}, OK: {skipped}")
+        if is_ok:
+            skipped += 1
+        else:
+            notified += 1
+
+    print(f"\nDone! Under 8h: {notified}, OK: {skipped}")
 
 
 if __name__ == "__main__":
